@@ -5,6 +5,8 @@ import com.amazonaws.serverless.proxy.model.AwsProxyRequest
 import com.amazonaws.serverless.proxy.model.AwsProxyResponse
 import com.amazonaws.services.lambda.runtime.Context
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpStatus
@@ -14,7 +16,16 @@ import spock.lang.Shared
 import spock.lang.AutoCleanup
 import io.micronaut.function.aws.proxy.MicronautLambdaHandler
 
+import javax.inject.Singleton
+
+@Factory
 class BookControllerSpec extends Specification {
+
+    @Singleton
+    @Replaces(BookService)
+    BookService mockBookService() {
+        Mock(BookService)
+    }
 
     @Shared
     @AutoCleanup
@@ -25,6 +36,9 @@ class BookControllerSpec extends Specification {
 
     @Shared
     ObjectMapper objectMapper = handler.applicationContext.getBean(ObjectMapper)
+
+    @Shared
+    BookService bookService = handler.applicationContext.getBean(BookService)
 
     void "test save Book"() {
         given:
@@ -39,6 +53,9 @@ class BookControllerSpec extends Specification {
         AwsProxyResponse response = handler.handleRequest(request, lambdaContext)
 
         then:
+        1 * bookService.save(_) >> new BookSaved(name: book.name, isbn: 'mock-isbn')
+
+        and:
         HttpStatus.OK.code == response.statusCode
         response.body
 
@@ -47,6 +64,6 @@ class BookControllerSpec extends Specification {
 
         then:
         bookSaved.name == book.name
-        bookSaved.isbn
+        bookSaved.isbn == 'mock-isbn'
     }
 }
